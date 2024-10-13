@@ -47,4 +47,10 @@ def pecherskaya_handler(message):
     response = audience_of_pecherskaya.get(str(user_input), "Аудитория не найдена.")
     bot.send_message(message.chat.id, response)
 
+@bot.message_handler(func=lambda message: 'спасибо' in message.text.lower())
+def thank():
+    answer_for_thank = ['Не за что!', 'Обращайся!', 'Рад помочь!']
+    bot.send_message(message.chat.id, random.choice(answer_for_thank))
+
+
 bot.infinity_polling()
