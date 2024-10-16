@@ -1,6 +1,6 @@
 import telebot
 from telebot import types
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 import pandas as pd
@@ -59,6 +59,23 @@ def get_group_info(group):
     group_info = df_group_info[df_group_info[1].str.contains(group, na=False)]
     return group_info
 
+def get_day_name_en(date):
+    days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+    return days_en[date.weekday()]
+
+def get_day_name_ru(date):
+    days_ru = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
+    return days_ru[date.weekday()]
+
+# Функция для отправки кнопок выбора расписания
+def send_schedule_options(chat_id, group):
+    markup = types.InlineKeyboardMarkup()
+    button_week = types.InlineKeyboardButton("Неделя", callback_data=f'week_timetable_{group}')
+    button_today = types.InlineKeyboardButton("Сегодня", callback_data=f'today_timetable_{group}')
+    button_tomorrow = types.InlineKeyboardButton("Завтра", callback_data=f'tomorrow_timetable_{group}')
+    markup.add(button_week, button_today, button_tomorrow)
+    bot.send_message(chat_id, "Выбери нужное расписание.", reply_markup=markup)
+
 # Команда /start
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -72,6 +89,10 @@ def start_message(message):
 def timetable_message(message):
     today = datetime.now().weekday()  # 0 - понедельник, 6 - воскресенье
     chat_id = message.chat.id
+
+    if today == 6:  # Воскресенье
+        bot.send_message(chat_id, "Ура! Сегодня выходной.")
+        return
 
     #Отправка обычного расписания
     if today not in [3, 5]:
@@ -88,14 +109,8 @@ def timetable_message(message):
             # Отправляем сообщение с кнопками выбора группы
             bot.send_message(chat_id, "Выбери свою группу.", reply_markup=markup)
         else:
-            # Создаем кнопки для выбора расписания
-            markup = types.InlineKeyboardMarkup()
-            button_week = types.InlineKeyboardButton("Расписание на неделю", callback_data=f'week_timetable_{group}')
-            button_day = types.InlineKeyboardButton("Расписание на день", callback_data=f'day_timetable_{group}')
-            markup.add(button_week, button_day)
-
-            # Отправляем сообщение с кнопками выбора расписания
-            bot.send_message(chat_id, "Тебе нужно расписание на день или на неделю?", reply_markup=markup)
+            # Используем функцию для отправки кнопок выбора расписания
+            send_schedule_options(chat_id, group)
     else:
         # Расписание по английскому
         user_states[chat_id] = 'awaiting_name'
@@ -175,31 +190,63 @@ def handle_callback_query(call):
         group = data.split('_')[1]  # Получаем номер группы
         user_group_choice[chat_id] = group  # Сохраняем выбранную группу
 
-        bot.answer_callback_query(call.id, f"Вы выбрали группу 24КНТ-{group}.")
+        bot.answer_callback_query(call.id, f"Твоя группа 24КНТ-{group}.")
 
-        # Создаем кнопки для выбора расписания
-        markup = types.InlineKeyboardMarkup()
-        button_week = types.InlineKeyboardButton("Расписание на неделю", callback_data=f'week_timetable_{group}')
-        button_day = types.InlineKeyboardButton("Расписание на день", callback_data=f'day_timetable_{group}')
-        markup.add(button_week, button_day)
+        # Используем функцию для отправки кнопок выбора расписания
+        send_schedule_options(chat_id, group)
 
-        # Отправляем сообщение с кнопками выбора расписания
-        bot.send_message(chat_id, "Тебе нужно расписание на день или на неделю?", reply_markup=markup)
-
-    # Обработка расписания
-    elif data.startswith('week_timetable_') or data.startswith('day_timetable_'):
+    # Обработка расписания на неделю
+    elif data.startswith('week_timetable_'):
         parts = data.split('_')
-        timetable_type = parts[0]  # 'week' или 'day'
         group = parts[-1]  # Номер группы
-        filename = f'{timetable_type}_timetable_{group}.jpg'  # Формируем имя файла расписания
+        filename = f'week_timetable_{group}.jpg'  # Формируем имя файла расписания
+
+        # Формируем путь к файлу
+        group_folder = f'24CST-{group}'
+        filepath = os.path.join('timetables', group_folder, filename)
 
         try:
-            with open(filename, 'rb') as image:
-                text = f"Вот расписание на {'неделю' if timetable_type == 'week' else 'день'} для 24КНТ-{group} группы."
+            with open(filepath, 'rb') as image:
+                text = f"Вот расписание на неделю для группы 24КНТ-{group}."
                 bot.send_message(chat_id, text)
                 bot.send_photo(chat_id, image)
         except FileNotFoundError:
             bot.send_message(chat_id, "Извини, твоё расписание пока не готово.")
+
+    # Обработка расписания на сегодня и завтра
+    elif data.startswith('today_timetable_') or data.startswith('tomorrow_timetable_'):
+        parts = data.split('_')
+        timetable_type = parts[0]  # 'today' или 'tomorrow'
+        group = parts[-1]  # Номер группы
+        
+        # Определяем соответствующий день недели
+        if timetable_type == 'today':
+            target_date = datetime.now()
+            day_en = get_day_name_en(target_date) 
+            day_ru = get_day_name_ru(target_date) 
+            day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru  # Используем русское название в сообщении
+        elif timetable_type == 'tomorrow':
+            target_date = datetime.now() + timedelta(days=1)
+            if target_date.weekday() == 6:
+                bot.send_message(chat_id, "Завтра воскресенье — выходной день. Расписание отсутствует.")
+                return
+            day_en = get_day_name_en(target_date) 
+            day_ru = get_day_name_ru(target_date) 
+            day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru # Используем русское название в сообщении
+
+        filename = f'{day_en}_timetable_{group}.jpg'  # Формируем имя файла расписания
+
+        # Формируем путь к файлу 
+        group_folder = f'24CST-{group}'
+        filepath = os.path.join('timetables', group_folder, filename)
+
+        try:
+            with open(filepath, 'rb') as image:
+                text = f"Вот расписание на {day_display} для 24КНТ-{group} группы."
+                bot.send_message(chat_id, text)
+                bot.send_photo(chat_id, image)
+        except FileNotFoundError:
+            bot.send_message(chat_id, f"Извини, расписание на {day_display} пока не готово.")
 
     # Обработка дедлайнов
     elif data.startswith('deadline_'):
