@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import json
 import os
 import pandas as pd
+import threading
+import time
 
 bot = telebot.TeleBot('8179560224:AAF6aFKzEp6zJN1s31whhtHB-ABgKDzzv_E')
 
@@ -42,6 +44,32 @@ def save_deadlines():
 
 # Загрузка дедлайнов при старте бота
 load_deadlines()
+
+# Функция для отправки напоминаний
+def send_reminders():
+    while True:
+        now = datetime.now()
+        for chat_id, deadlines in user_deadlines.items():
+            for deadline in deadlines:
+                deadline_date = datetime.strptime(deadline['date'], '%d.%m.%Y').date()
+                # Определяем даты для напоминаний
+                reminder_dates = [
+                    deadline_date - timedelta(weeks=1),  # за неделю
+                    deadline_date - timedelta(days=3),    # за 3 дня
+                    deadline_date - timedelta(days=1),    # за день
+                    deadline_date                          # в день дедлайна
+                ]
+                # Проверяем, нужно ли отправить напоминание
+                for reminder_date in reminder_dates:
+                    if now.date() == reminder_date:
+                        bot.send_message(chat_id, f"Напоминание: Дедлайн '{deadline['name']}' наступает {deadline['date']}!")
+
+        
+        time.sleep(86400)  # Проверяем раз сутки
+
+# Запускаем поток для отправки напоминаний
+reminder_thread = threading.Thread(target=send_reminders, daemon=True)
+reminder_thread.start()
 
 # Функция для получения группы по ФИО
 def get_group_by_fio(fio):
@@ -119,17 +147,14 @@ def timetable_message(message):
 # Команда /deadline
 @bot.message_handler(commands=['deadline'])
 def deadline_command(message):
-    markup_remove = types.ReplyKeyboardRemove()
-    bot.send_message(message.chat.id, "Что ты хочешь сделать?", reply_markup=markup_remove)
-
     # Создаем кнопки для дедлайнов
     markup = types.InlineKeyboardMarkup()
-    button_add = types.InlineKeyboardButton("Добавить дедлайн", callback_data='deadline_add_deadline')
-    button_view = types.InlineKeyboardButton("Посмотреть дедлайны", callback_data='deadline_view_deadlines')
+    button_add = types.InlineKeyboardButton("➕ Добавить дедлайн", callback_data='deadline_add_deadline')
+    button_view = types.InlineKeyboardButton("📋 Посмотреть дедлайны", callback_data='deadline_view_deadlines')
     markup.add(button_add, button_view)
 
     # Отправляем сообщение с кнопками для дедлайнов
-    bot.send_message(message.chat.id, "Выберите действие:", reply_markup=markup)
+    bot.send_message(message.chat.id, "Что ты хочешь сделать?", reply_markup=markup)
 
 # Обработчик ввода ФИО
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'awaiting_name')
@@ -253,43 +278,133 @@ def handle_callback_query(call):
         if data == 'deadline_add_deadline':
             user_states[chat_id] = 'awaiting_deadline_name'
             bot.send_message(chat_id, "Введи название дедлайна:")
+
         elif data == 'deadline_view_deadlines':
             deadlines = user_deadlines.get(str(chat_id), [])
             if not deadlines:
                 bot.send_message(chat_id, "У тебя пока нет дедлайнов.")
             else:
-                response = "Твои дедлайны:\n"
+                response = "📋 *Твои дедлайны:*\n"
+                markup = types.InlineKeyboardMarkup()
                 for idx, deadline in enumerate(deadlines, 1):
-                    response += f"{idx}. {deadline['name']} - {deadline['date']}\n"
-                bot.send_message(chat_id, response)
+                    response += f"{idx}. *{deadline['name']}* - {deadline['date']}\n"
+                    edit_button = types.InlineKeyboardButton(f"✏ Изменить {idx}", callback_data=f'deadline_edit_{idx-1}_name')
+                    delete_button = types.InlineKeyboardButton(f"🗑 Удалить {idx}", callback_data=f'deadline_delete_{idx-1}')
+                    markup.add(edit_button, delete_button)
+                bot.send_message(chat_id, response, parse_mode='Markdown', reply_markup=markup)
+
+        elif data.startswith('deadline_edit_'):
+            try:
+                parts = data.split('_')
+                idx = int(parts[2])
+                if len(parts) > 3 and parts[3] == 'name':
+                    user_states[chat_id] = f'editing_deadline_{idx}_name'
+                    bot.send_message(chat_id, f"Введи новое название дедлайна #{idx+1}:")
+                else:
+                    bot.send_message(chat_id, "Что-то пошло не так...")
+            except ValueError:
+                bot.send_message(chat_id, "Ошибка обработки данных.")
+        
+        elif data.startswith('deadline_delete_'):
+            try:
+                idx = int(data.split('_')[-1])
+                deadlines = user_deadlines.get(str(chat_id), [])
+                if 0 <= idx < len(deadlines):
+                    deleted = deadlines.pop(idx)
+                    user_deadlines[str(chat_id)] = deadlines
+                    save_deadlines()
+                    bot.send_message(chat_id, f"✅ Дедлайн *'{deleted['name']}'* удалён.", parse_mode='Markdown')
+                else:
+                    bot.send_message(chat_id, "Неверный индекс дедлайна.")
+            except ValueError:
+                bot.send_message(chat_id, "Ошибка обработки данных.")
+
+    bot.answer_callback_query(call.id)
 
 # Обработчик для добавления дедлайна
-@bot.message_handler(func=lambda message: user_states.get(message.chat.id) in ['awaiting_deadline_name', 'awaiting_deadline_date'])
+@bot.message_handler(func=lambda message: True)
 def handle_deadline_input(message):
     chat_id = message.chat.id
-    state = user_states.get(chat_id)
+    state = user_states.get(chat_id, '')
 
     if state == 'awaiting_deadline_name':
+        deadline_name = message.text.strip()
+        if not deadline_name:
+            bot.send_message(chat_id, "Название дедлайна не может быть пустым. Введи название:")
+            return
         # Сохраняем название дедлайна и ожидаем дату
-        user_deadlines.setdefault(str(chat_id), []).append({'name': message.text, 'date': None})
+        user_deadlines.setdefault(str(chat_id), []).append({'name': deadline_name, 'date': ''})
         user_states[chat_id] = 'awaiting_deadline_date'
         bot.send_message(chat_id, "Введите дату дедлайна в формате День.Месяц.Год (например, 31.12.2024):")
+    
     elif state == 'awaiting_deadline_date':
+        deadline_date_input = message.text.strip()
         # Проверяем формат даты
         try:
             deadline_date = datetime.strptime(message.text, '%d.%m.%Y').date()
-            # Сохраняем дату в последний добавленный дедлайн
-            deadlines = user_deadlines.get(str(chat_id), [])
-            if deadlines and deadlines[-1]['date'] is None:
-                deadlines[-1]['date'] = message.text
-                save_deadlines()
-                bot.send_message(chat_id, "Дедлайн успешно добавлен!")
-            else:
-                bot.send_message(chat_id, "Произошла ошибка при сохранении дедлайна.")
+            deadline_date_str = deadline_date.strftime('%d.%m.%Y')
         except ValueError:
             bot.send_message(chat_id, "Неверный формат даты. Пожалуйста, введи дату в формате День.Месяц.Год (например, 31.12.2024):")
             return
+        # Сохраняем дату в последний добавленный дедлайн
+        deadlines = user_deadlines.get(str(chat_id), [])
+        if deadlines and deadlines[-1]['date'] == '':
+            deadlines[-1]['date'] = deadline_date_str
+            user_deadlines[str(chat_id)] = deadlines
+            save_deadlines()
+            bot.send_message(chat_id, f"✅ Дедлайн *'{deadlines[-1]['name']}'* с датой *{deadline_date_str}* добавлен.", parse_mode='Markdown')
+            user_states.pop(chat_id, None)
+        else:
+            bot.send_message(chat_id, "Произошла ошибка при сохранении дедлайна.")
+            user_states.pop(chat_id, None)
+    
+    elif state.startswith('editing_deadline_'):
+        try:
+            parts = state.split('_')
+            if len(parts) == 4 and parts[2].isdigit() and parts[3] == 'name':
+                idx = int(parts[2])
+                new_name = message.text.strip()
+                if not new_name:
+                    bot.send_message(chat_id, "Название дедлайна не может быть пустым. Введи новое название:")
+                    return
+                deadlines = user_deadlines.get(str(chat_id), [])
+                if 0 <= idx < len(deadlines):
+                    old_name = deadlines[idx]['name']
+                    deadlines[idx]['name'] = new_name
+                    user_deadlines[str(chat_id)] = deadlines
+                    bot.send_message(chat_id, f"✅ Дедлайн #{idx+1} успешно изменён с *'{old_name}'* на *'{new_name}'*.", parse_mode='Markdown')
+                    user_states[chat_id] = f'editing_deadline_{idx}_date'
+                    bot.send_message(chat_id, f"Введи новую дату дедлайна #{idx+1} в формате День.Месяц.Год (например, 31.12.2024):")
+                else:
+                    bot.send_message(chat_id, "Неверный индекс дедлайна.")
 
-        user_states.pop(chat_id, None)
+            elif len(parts) == 4 and parts[2].isdigit() and parts[3] == 'date':
+                idx = int(parts[2])
+                new_date_input = message.text.strip()
+                try:
+                    new_date = datetime.strptime(new_date_input, '%d.%m.%Y').date()
+                    new_date_str = new_date.strftime('%d.%m.%Y')
+                except ValueError:
+                    bot.send_message(chat_id, "Неверный формат даты. Пожалуйста, введи дату в формате День.Месяц.Год (например, 31.12.2024):")
+                    return
+                deadlines = user_deadlines.get(str(chat_id), [])
+                if 0 <= idx < len(deadlines):
+                    old_date = deadlines[idx]['date']
+                    deadlines[idx]['date'] = new_date_str
+                    user_deadlines[str(chat_id)] = deadlines
+                    save_deadlines()
+                    bot.send_message(chat_id, f"✅ Дедлайн #{idx+1} успешно обновлён:\n*Название:* {deadlines[idx]['name']}\n*Дата:* {new_date_str}", parse_mode='Markdown')
+                else:
+                    bot.send_message(chat_id, "Неверный индекс дедлайна.")
 
+                user_states.pop(chat_id, None)
+            else:
+                bot.send_message(chat_id, "Неверный формат состояния.")
+        except Exception as e:
+            bot.send_message(chat_id, "Произошла ошибка при обработке запроса.")
+            user_states.pop(chat_id, None)
+        except ValueError:
+            bot.send_message(chat_id, "Ошибка обработки данных.")
+            user_states.pop(chat_id, None)
+    
 bot.infinity_polling()
