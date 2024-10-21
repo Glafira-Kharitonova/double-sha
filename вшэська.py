@@ -42,6 +42,28 @@ def save_deadlines():
     with open(DEADLINES_FILE, 'w', encoding='utf-8') as f:
         json.dump(user_deadlines, f, ensure_ascii=False, indent=4)
 
+# Функция для автоудаления просроченных дедлайнов
+def check_and_remove_expired_deadlines():
+    current_date = datetime.now().date()
+    for chat_id, deadlines in user_deadlines.items():
+        expired_deadlines = []
+        
+        # Проверяем каждый дедлайн
+        for deadline in deadlines:
+            deadline_date = datetime.strptime(deadline['date'], '%d.%m.%Y').date()
+            
+            if deadline_date < current_date:
+                expired_deadlines.append(deadline)
+        
+        if expired_deadlines:
+            # Удаляем просроченные дедлайны
+            user_deadlines[chat_id] = [d for d in deadlines if d not in expired_deadlines]
+            save_deadlines()
+            
+            # Уведомляем пользователя
+            expired_names = ', '.join([d['name'] for d in expired_deadlines])
+            bot.send_message(chat_id, f"⚠️ Истекшие дедлайны удалены: {expired_names}")
+
 # Загрузка дедлайнов при старте бота
 load_deadlines()
 
@@ -70,6 +92,9 @@ def send_reminders():
 # Запускаем поток для отправки напоминаний
 reminder_thread = threading.Thread(target=send_reminders, daemon=True)
 reminder_thread.start()
+
+# Проверка на истекшие дедлайны при старте бота
+check_and_remove_expired_deadlines()
 
 # Функция для получения группы по ФИО
 def get_group_by_fio(fio):
@@ -333,7 +358,7 @@ def handle_deadline_input(message):
     if state == 'awaiting_deadline_name':
         deadline_name = message.text.strip()
         if not deadline_name:
-            bot.send_message(chat_id, "Название дедлайна не может быть пустым. Введи название:")
+            bot.send_message(chat_id, "⚠️ Название дедлайна не может быть пустым. Введи название:")
             return
         # Сохраняем название дедлайна и ожидаем дату
         user_deadlines.setdefault(str(chat_id), []).append({'name': deadline_name, 'date': ''})
@@ -349,10 +374,10 @@ def handle_deadline_input(message):
 
             # Проверка на просроченность
             if deadline_date < datetime.now().date():
-                bot.send_message(chat_id, "Ошибка: дата дедлайна не может быть в прошлом. Введите корректную дату:")
+                bot.send_message(chat_id, "⚠️ Ошибка: дата дедлайна не может быть в прошлом. Введите корректную дату:")
                 return
         except ValueError:
-            bot.send_message(chat_id, "Неверный формат даты. Пожалуйста, введи дату в формате День.Месяц.Год (например, 31.12.2024):")
+            bot.send_message(chat_id, "⚠️ Неверный формат даты. Пожалуйста, введи дату в формате День.Месяц.Год (например, 31.12.2024):")
             return
         # Сохраняем дату в последний добавленный дедлайн
         deadlines = user_deadlines.get(str(chat_id), [])
