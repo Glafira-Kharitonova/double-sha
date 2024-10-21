@@ -261,7 +261,7 @@ def handle_callback_query(call):
 
         # Для других дней недели:
         day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru  # Используем русское название в сообщении
-    
+
         filename = f'{day_en}_timetable_{group}.jpg'  # Формируем имя файла расписания
 
         # Формируем путь к файлу 
@@ -346,6 +346,11 @@ def handle_deadline_input(message):
         try:
             deadline_date = datetime.strptime(message.text, '%d.%m.%Y').date()
             deadline_date_str = deadline_date.strftime('%d.%m.%Y')
+
+            # Проверка на просроченность
+            if deadline_date < datetime.now().date():
+                bot.send_message(chat_id, "Ошибка: дата дедлайна не может быть в прошлом. Введите корректную дату:")
+                return
         except ValueError:
             bot.send_message(chat_id, "Неверный формат даты. Пожалуйста, введи дату в формате День.Месяц.Год (например, 31.12.2024):")
             return
