@@ -247,18 +247,21 @@ def handle_callback_query(call):
         # Определяем соответствующий день недели
         if timetable_type == 'today':
             target_date = datetime.now()
-            day_en = get_day_name_en(target_date) 
-            day_ru = get_day_name_ru(target_date) 
-            day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru  # Используем русское название в сообщении
         elif timetable_type == 'tomorrow':
             target_date = datetime.now() + timedelta(days=1)
-            if target_date.weekday() == 6:
-                bot.send_message(chat_id, "Завтра воскресенье — выходной день. Расписание отсутствует.")
-                return
-            day_en = get_day_name_en(target_date) 
-            day_ru = get_day_name_ru(target_date) 
-            day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru # Используем русское название в сообщении
 
+        day_en = get_day_name_en(target_date) 
+        day_ru = get_day_name_ru(target_date) 
+
+        # Проверяем, выпадает ли завтрашний день на четверг или субботу
+        if timetable_type == 'tomorrow' and target_date.weekday() in [3, 5]:  # Четверг = 3, Суббота = 5
+            bot.send_message(chat_id, "Завтра у тебя английский язык. Пожалуйста, введи свое полное имя (Фамилия Имя Отчество) (например, Иванов Иван Иванович):")
+            user_states[chat_id] = 'awaiting_name'
+            return
+
+        # Для других дней недели:
+        day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru  # Используем русское название в сообщении
+    
         filename = f'{day_en}_timetable_{group}.jpg'  # Формируем имя файла расписания
 
         # Формируем путь к файлу 
