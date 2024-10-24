@@ -62,7 +62,7 @@ def check_and_remove_expired_deadlines():
             
             # Уведомляем пользователя
             expired_names = ', '.join([d['name'] for d in expired_deadlines])
-            bot.send_message(chat_id, f"⚠️ Истекшие дедлайны удалены: {expired_names}")
+            bot.send_message(chat_id, f"Истекшие дедлайны удалены: {expired_names}")
 
 # Загрузка дедлайнов при старте бота
 load_deadlines()
@@ -198,34 +198,43 @@ def handle_name_input(message):
 
         # Определяем день недели и соответствующий лист
         today = datetime.now().weekday()
-        sheet_name = 'Четверг' if today == 3 else 'Суббота'  # 3 - четверг, 5 - суббота
+        tomorrow = (today + 1) % 7
 
         # Чтение второго файла с информацией по группам
         try:
-            group_info_df = pd.read_excel(GROUP_INFO_FILE, sheet_name=sheet_name, header=None)
-        except ValueError as e:
-            bot.send_message(chat_id, "Похоже файл с твоим расписанием отсутствует.")
-            return
+            # Определяем имя листа в зависимости от дня
+            if tomorrow == 3:
+                sheet_name = 'Четверг'  # Завтра четверг
+            elif tomorrow == 5:
+                sheet_name = 'Суббота'  # Завтра суббота
+            else:
+                sheet_name = None
 
-        # Находим строки, соответствующие номеру группы
-        group_info_rows = group_info_df[group_info_df[1] == group_number]
+            if sheet_name:
+                group_info_df = pd.read_excel(GROUP_INFO_FILE, sheet_name=sheet_name, header=None)
 
-        if not group_info_rows.empty:
-            # Собираем данные из всех строк
-            response_lines = []
-            for _, row in group_info_rows.iterrows():
-                time = str(row[0])  # Время
-                audience_number = str(int(row[2])) if len(str(int(row[2]))) == 3 else '0' + str(int(row[2])) # Аудитория
-                building = str(row[3])  # Корпус
+                group_info_rows = group_info_df[group_info_df[1] == group_number]
 
-                # Формируем строку ответа
-                response_lines.append(f"Время: {time}, Аудитория: {audience_number}, Корпус: {building}")
+                if not group_info_rows.empty:
+                    response_lines = []
+                    for _, row in group_info_rows.iterrows():
+                        time = str(row[0])  # Время
+                        audience_number = str(int(row[2])) if len(str(int(row[2]))) == 3 else '0' + str(int(row[2])) # Аудитория
+                        building = str(row[3])  # Корпус
 
-            # Формируем ответ
-            response = f"Группа: {group_number}\n" + "\n".join(response_lines)
-            bot.send_message(chat_id, response)
-        else:
-            bot.send_message(chat_id, f"У этой группы {group_number} сегодня нет английского.\nПопробуй в другой день.")
+                        # Формируем строку ответа
+                        response_lines.append(f"Время: {time}, Аудитория: {audience_number}, Корпус: {building}")
+        
+                    # Формируем ответ
+                    response = f"Группа: {group_number}\n" + "\n".join(response_lines)
+                    bot.send_message(chat_id, response)
+                else:
+                    bot.send_message(chat_id, f"У группы {group_number} завтра нет английского.\nПопробуй в другой день.")
+            else:
+                bot.send_message(chat_id, "Завтра нет занятий по английскому.")
+        except Exception as e:
+            print(f"Error while reading schedule: {e}")
+            bot.send_message(chat_id, "Произошла ошибка при получении расписания.")
     else:
         bot.send_message(chat_id, "Твоё ФИО не найдено.")
 
@@ -279,7 +288,7 @@ def handle_callback_query(call):
         day_ru = get_day_name_ru(target_date) 
 
         # Проверяем, выпадает ли завтрашний день на четверг или субботу
-        if timetable_type == 'tomorrow' and target_date.weekday() in [3, 5]:  # Четверг = 3, Суббота = 5
+        if target_date.weekday() in [3, 5]:  # Четверг = 3, Суббота = 5
             bot.send_message(chat_id, "Завтра у тебя английский язык. Пожалуйста, введи свое полное имя (Фамилия Имя Отчество) (например, Иванов Иван Иванович):")
             user_states[chat_id] = 'awaiting_name'
             return
@@ -440,4 +449,4 @@ def handle_deadline_input(message):
             bot.send_message(chat_id, "Ошибка обработки данных.")
             user_states.pop(chat_id, None)
     
-bot.infinity_polling()
+bot.infinity_polling() 
