@@ -17,13 +17,6 @@ def send_support_message(message):
     bot.send_message(message.chat.id, random.choice(support_messages))
 
 
-@bot.message_handler(content_types=['text'])
-def start_message(message):
-    with open('start_message.txt', 'r', encoding='utf-8') as file:
-        answer = file.read()
-    if message.text == "/start":
-        bot.send_message(message.chat.id, answer)
-
 @bot.message_handler(commands=['audience'])
 def audience(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -64,7 +57,7 @@ def pecherskaya_handler(message):
 
 @bot.message_handler(func=lambda message: 'спасибо' in message.text.lower())
 def thank():
-    answer_for_thank = ['Не за что!', 'Обращайся!', 'Рад помочь!']
+    answer_for_thank = ['Не за что!', 'Обращайся!', 'Рад помочь!', 'Успехов Вам!']
     bot.send_message(message.chat.id, random.choice(answer_for_thank))
 
 
