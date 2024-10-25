@@ -3,6 +3,7 @@ from telebot import types
 import random
 bot = telebot.TeleBot('8179560224:AAF6aFKzEp6zJN1s31whhtHB-ABgKDzzv_E')
 
+#Сообщение-приветствие
 @bot.message_handler(commands=['start'])
 def start_message(message):
     with open('start_message.txt', 'r', encoding='utf-8') as file:
@@ -16,7 +17,7 @@ def send_support_message(message):
         support_messages = [line for line in file.readlines()]
     bot.send_message(message.chat.id, random.choice(support_messages))
 
-
+#Обработчик команды \audience
 @bot.message_handler(commands=['audience'])
 def audience(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -55,9 +56,10 @@ def pecherskaya_handler(message):
     response = audience_of_pecherskaya.get(str(user_input), "Аудитория не найдена.")
     bot.send_message(message.chat.id, response)
 
+#Ответ на благодарность от пользователя
 @bot.message_handler(func=lambda message: 'спасибо' in message.text.lower())
 def thank():
-    answer_for_thank = ['Не за что!', 'Обращайся!', 'Рад помочь!', 'Успехов Вам!']
+    answer_for_thank = ['Не за что!', 'Обращайтесь!', 'Рад помочь!', 'Успехов Вам!']
     bot.send_message(message.chat.id, random.choice(answer_for_thank))
 
 
