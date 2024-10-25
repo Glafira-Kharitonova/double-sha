@@ -222,7 +222,7 @@ def handle_subject_input(message):
                         lecturer_info += f"\n✉️ Почта: {email}"
                     else:
                         lecturer_info += "\n✉️ Почта: Информация отсутствует"
-                    lecturers_info.append(lecturer_info)
+                    lecturers_info.append(lecturer_info + "\n")
 
                 if formula:
                     formulas_info.append(f"📐 {formula}")
@@ -235,7 +235,7 @@ def handle_subject_input(message):
 
             # Проверяем наличие информации о преподавателях
             if lecturers_info:
-                response += "\n".join(lecturers_info) + "\n\n"
+                response += "\n".join(lecturers_info) + "\n"
             else:
                 response += "📚 Преподаватели: Информация отсутствует\n\n"
 
@@ -249,8 +249,6 @@ def handle_subject_input(message):
             else:
                 response += "📆 Модули с экзаменами: Информация отсутствует"
 
-            # Убираем лишний перенос строки
-            response = response.rstrip()
             bot.send_message(chat_id, response)
         else:
             bot.send_message(chat_id, f"Предмет, содержащий '{subject_input}', не найден. Проверьте название и попробуйте снова.")
