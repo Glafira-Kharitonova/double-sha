@@ -19,6 +19,7 @@ DEADLINES_FILE = 'files/deadlines.json'
 LECTURER_INFO_FILE = 'files/lecturer_info.xlsx'
 NAME_GROUP_FILE = 'eng timetable files/names_groups.xlsx'  # Первый Excel файл с именами и группами
 GROUP_INFO_FILE = 'eng timetable files/group_info.xlsx'    # Второй Excel файл с расписанием по группам
+SCHEDULE_DAY_FILE_TEMPLATE = 'timetables/day/day_timetable_{}.json'  # Шаблон для имени файла
 
 # Функция для загрузки дедлайнов из файла
 def load_deadlines():
@@ -85,7 +86,7 @@ def send_reminders():
                 # Проверяем, нужно ли отправить напоминание
                 for reminder_date in reminder_dates:
                     if now.date() == reminder_date:
-                        bot.send_message(chat_id, f"Напоминание: Дедлайн '{deadline['name']}' наступает {deadline['date']}!")
+                        bot.send_message(chat_id, f"❗️Напоминание: Дедлайн '{deadline['name']}' наступает {deadline['date']}!")
 
         
         time.sleep(86400)  # Проверяем раз сутки
@@ -124,10 +125,9 @@ def get_day_name_ru(date):
 # Функция для отправки кнопок выбора расписания
 def send_schedule_options(chat_id, group):
     markup = types.InlineKeyboardMarkup()
-    button_week = types.InlineKeyboardButton("Неделя", callback_data=f'week_timetable_{group}')
-    button_today = types.InlineKeyboardButton("Сегодня", callback_data=f'today_timetable_{group}')
-    button_tomorrow = types.InlineKeyboardButton("Завтра", callback_data=f'tomorrow_timetable_{group}')
-    markup.add(button_week, button_today, button_tomorrow)
+    button_week = types.InlineKeyboardButton("На неделю", callback_data=f'week_timetable_{group}')
+    button_today = types.InlineKeyboardButton("На день", callback_data=f'today_timetable_{group}')
+    markup.add(button_week, button_today)
     bot.send_message(chat_id, "Выбери нужное расписание.", reply_markup=markup)
 
 # Команда /start
@@ -138,37 +138,21 @@ def start_message(message):
     if message.text == "/start":
         bot.send_message(message.chat.id, answer)
 
+input_day = None
+
 # Команда /timetable
 @bot.message_handler(commands=['timetable'])
 def timetable_message(message):
-    today = datetime.now().weekday()  # 0 - понедельник, 6 - воскресенье
     chat_id = message.chat.id
 
-    if today == 6:  # Воскресенье
-        bot.send_message(chat_id, "Ура! Сегодня выходной.")
-        return
+    markup = types.InlineKeyboardMarkup()
+    button1 = types.InlineKeyboardButton("24КНТ-4", callback_data='group_4')
+    button2 = types.InlineKeyboardButton("24КНТ-5", callback_data='group_5')
+    button3 = types.InlineKeyboardButton("24КНТ-6", callback_data='group_6')
+    markup.add(button1, button2, button3)
 
-    #Отправка обычного расписания
-    if today not in [3, 5]:
-        group = user_group_choice.get(chat_id)
+    bot.send_message(chat_id, "Выбери свою группу.", reply_markup=markup)
 
-        if not group:
-            # Создаем кнопки для выбора группы
-            markup = types.InlineKeyboardMarkup()
-            button1 = types.InlineKeyboardButton("24КНТ-4", callback_data='group_4')
-            button2 = types.InlineKeyboardButton("24КНТ-5", callback_data='group_5')
-            button3 = types.InlineKeyboardButton("24КНТ-6", callback_data='group_6')
-            markup.add(button1, button2, button3)
-
-            # Отправляем сообщение с кнопками выбора группы
-            bot.send_message(chat_id, "Выбери свою группу.", reply_markup=markup)
-        else:
-            # Используем функцию для отправки кнопок выбора расписания
-            send_schedule_options(chat_id, group)
-    else:
-        # Расписание по английскому
-        user_states[chat_id] = 'awaiting_name'
-        bot.send_message(chat_id, "Сегодня у тебя английский язык. Пожалуйста, введи свое полное имя (Фамилия Имя Отчество) (например, Иванов Иван Иванович):")
         
 # Команда /deadline
 @bot.message_handler(commands=['deadline'])
@@ -256,66 +240,103 @@ def handle_subject_input(message):
         print(f"Error while reading lecturer data: {e}")
         bot.send_message(chat_id, "Произошла ошибка при обработке данных. Пожалуйста, попробуйте позже.")
 
+# Обработчик ввода дня недели
+@bot.message_handler(func=lambda message: user_states.get(message.chat.id) in ['awaiting_day', 'awaiting_specific_day'])
+def handle_day_input(message):
+    global input_day
+    chat_id = message.chat.id
+    input_day = message.text.strip().lower()
+    user_states.pop(chat_id, None)
+
+    # Проверяем, что введен корректный день недели
+    valid_days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+    if input_day not in valid_days:
+        bot.send_message(chat_id, "Неверный день недели. Пожалуйста, введите корректный день.")
+        return
+
+    group = user_group_choice.get(chat_id)
+    schedule_file = SCHEDULE_DAY_FILE_TEMPLATE.format(group)
+
+    # Проверка для "четверг" и "суббота" - дни английского языка
+    if input_day in ["четверг", "суббота"]:
+        bot.send_message(chat_id, "Пожалуйста, введите свое полное ФИО (например, Иванов Иван Иванович):")
+        user_states[chat_id] = 'awaiting_name'  # Устанавливаем состояние ожидания ФИО
+    else:
+        # Для остальных дней выводим обычное расписание
+        try:
+            with open(schedule_file, 'r', encoding='utf-8') as f:
+                schedule = json.load(f)
+
+            response_day = f'{input_day[:-1]}у' if input_day in ['пятница', 'среда'] else input_day
+            lessons = schedule['schedule'].get(input_day, [])
+            
+            if lessons:
+                response = f"✏️ _Расписание на {response_day} для группы {group}_: ✏️\n\n"
+                for lesson in lessons:
+                    response += f"*{lesson['subject']}*\n"
+                    response += f"\u200B    •    *{lesson['time']}* - {lesson['lesson_type']}\n"
+                    response += f"\u200B          *Преподаватель:* _{lesson['lecturer']}_\n"
+                    response += f"\u200B          *Аудитория:* _{lesson['room']}_\n"
+                    if 'dates' in lesson and lesson['dates']:
+                        response += f"\u200B          *Даты:* {', '.join(lesson['dates'])}\n"
+
+                    response += f"\n"
+
+                bot.send_message(chat_id, response.strip(), parse_mode='Markdown')
+            else:
+                bot.send_message(chat_id, f"На {response_day} нет занятий.")
+        except Exception as e:
+            bot.send_message(chat_id, "Произошла ошибка при получении расписания.")
+
 # Обработчик ввода ФИО
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'awaiting_name')
 def handle_name_input(message):
+    global input_day
     chat_id = message.chat.id
     full_name = message.text.strip()
+    response_day = f'{input_day[:-1]}у' if input_day in ['пятница', 'среда'] else input_day
+    user_states.pop(chat_id, None)
 
-    # Чтение файла с именами и группами
-    name_group_df = pd.read_excel(NAME_GROUP_FILE, header=None)
+    try:
+        name_group_df = pd.read_excel(NAME_GROUP_FILE, header=None)
 
-    # Проверяем, существует ли ФИО в столбце B
-    if full_name in name_group_df[1].values:
-        # Находим номер группы
-        group_row = name_group_df[name_group_df[1] == full_name]
-        group_number = group_row.iloc[0][3]  # Извлекаем группу из столбца D
+        # Проверяем, существует ли ФИО в столбце с именами (B)
+        group_row = name_group_df[name_group_df[1].str.contains(full_name, na=False)]
+        if not group_row.empty:
+            group_number = group_row.iloc[0][3]  # Извлекаем группу из столбца с группами (D)
 
-        # Определяем день недели и соответствующий лист
-        today = datetime.now().weekday()
-        tomorrow = (today + 1) % 7
-
-        # Чтение второго файла с информацией по группам
-        try:
-            # Определяем имя листа в зависимости от дня
-            if tomorrow == 3:
-                sheet_name = 'Четверг'  # Завтра четверг
-            elif tomorrow == 5:
-                sheet_name = 'Суббота'  # Завтра суббота
-            else:
-                sheet_name = None
-
-            if sheet_name:
-                group_info_df = pd.read_excel(GROUP_INFO_FILE, sheet_name=sheet_name, header=None)
-
+            # Загрузка расписания по английскому на нужный день (четверг или суббота)
+            try:
+                group_info_df = pd.read_excel(GROUP_INFO_FILE, sheet_name=input_day, header=None)
                 group_info_rows = group_info_df[group_info_df[1] == group_number]
 
                 if not group_info_rows.empty:
-                    response_lines = []
+                    response_lines = [f"✏️ _Расписание английского для группы {group_number}_: ✏️\n"]
                     for _, row in group_info_rows.iterrows():
-                        time = str(row[0])  # Время
-                        audience_number = str(int(row[2])) if len(str(int(row[2]))) == 3 else '0' + str(int(row[2])) # Аудитория
-                        building = str(row[3])  # Корпус
+                        time = row[0]  # Время занятия
+                        audience_number = f"{int(row[2]):03}"  # Номер аудитории с ведущими нулями, если необходимо
+                        building = row[3]  # Корпус
+                        teacher = row[4]  # Преподаватель из столбца E
 
-                        # Формируем строку ответа
-                        response_lines.append(f"Время: {time}, Аудитория: {audience_number}, Корпус: {building}")
-        
-                    # Формируем ответ
-                    response = f"Группа: {group_number}\n" + "\n".join(response_lines)
-                    bot.send_message(chat_id, response)
+                        response_lines.append(f"\u200B    •    *Время:* _{time}_")
+                        response_lines.append(f"\u200B          *Преподаватель:* _{teacher}_")
+                        response_lines.append(f"\u200B          *Аудитория:* _{audience_number}_ - _{building}_\n")
+                
+                    response = "\n".join(response_lines)
+                    bot.send_message(chat_id, response, parse_mode='Markdown')
                 else:
-                    bot.send_message(chat_id, f"У группы {group_number} завтра нет английского.\nПопробуй в другой день.")
-            else:
-                bot.send_message(chat_id, "Завтра нет занятий по английскому.")
-        except Exception as e:
-            print(f"Error while reading schedule: {e}")
-            bot.send_message(chat_id, "Произошла ошибка при получении расписания.")
-    else:
-        bot.send_message(chat_id, "Твоё ФИО не найдено.")
+                    bot.send_message(chat_id, f"У группы {group_number} в {response_day} нет занятий по английскому.")
+            except Exception as e:
+                bot.send_message(chat_id, "Произошла ошибка при получении расписания по английскому.")
+        else:
+            bot.send_message(chat_id, "ФИО не найдено. Пожалуйста, проверь написание и попробуй снова.")
+    except Exception as e:
+        bot.send_message(chat_id, "Произошла ошибка при поиске группы по ФИО.")
 
 # Обработчик callback-запросов
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback_query(call):
+    global input_day
     data = call.data
     chat_id = call.message.chat.id
 
@@ -331,16 +352,11 @@ def handle_callback_query(call):
 
     # Обработка расписания на неделю
     elif data.startswith('week_timetable_'):
-        parts = data.split('_')
-        group = parts[-1]  # Номер группы
-        filename = f'week_timetable_{group}.jpg'  # Формируем имя файла расписания
-
-        # Формируем путь к файлу
-        group_folder = f'24CST-{group}'
-        filepath = os.path.join('timetables', group_folder, filename)
+        group = user_group_choice.get(chat_id)
+        filename = f'timetables/week/week_timetable_{group}.jpg'  # Формируем имя файла расписания
 
         try:
-            with open(filepath, 'rb') as image:
+            with open(filename, 'rb') as image:
                 text = f"Вот расписание на неделю для группы 24КНТ-{group}."
                 bot.send_message(chat_id, text)
                 bot.send_photo(chat_id, image)
@@ -348,43 +364,14 @@ def handle_callback_query(call):
             bot.send_message(chat_id, "Извини, твоё расписание пока не готово.")
 
     # Обработка расписания на сегодня и завтра
-    elif data.startswith('today_timetable_') or data.startswith('tomorrow_timetable_'):
-        parts = data.split('_')
-        timetable_type = parts[0]  # 'today' или 'tomorrow'
-        group = parts[-1]  # Номер группы
+    elif data.startswith('today_timetable_'):
+        group = user_group_choice.get(chat_id)
+
+        # Просим пользователя ввести день недели
+        bot.send_message(chat_id, "Введите день недели (например, понедельник):")
+        user_states[chat_id] = 'awaiting_day'  # Устанавливаем состояние ожидания дня недели
+        bot.answer_callback_query(call.id)
         
-        # Определяем соответствующий день недели
-        if timetable_type == 'today':
-            target_date = datetime.now()
-        elif timetable_type == 'tomorrow':
-            target_date = datetime.now() + timedelta(days=1)
-
-        day_en = get_day_name_en(target_date) 
-        day_ru = get_day_name_ru(target_date) 
-
-        # Проверяем, выпадает ли завтрашний день на четверг или субботу
-        if target_date.weekday() in [3, 5]:  # Четверг = 3, Суббота = 5
-            bot.send_message(chat_id, "Завтра у тебя английский язык. Пожалуйста, введи свое полное имя (Фамилия Имя Отчество) (например, Иванов Иван Иванович):")
-            user_states[chat_id] = 'awaiting_name'
-            return
-
-        # Для других дней недели:
-        day_display = day_ru[:-1] + 'у' if day_ru == 'среда' or day_ru == 'пятница' else day_ru  # Используем русское название в сообщении
-
-        filename = f'{day_en}_timetable_{group}.jpg'  # Формируем имя файла расписания
-
-        # Формируем путь к файлу 
-        group_folder = f'24CST-{group}'
-        filepath = os.path.join('timetables', group_folder, filename)
-
-        try:
-            with open(filepath, 'rb') as image:
-                text = f"Вот расписание на {day_display} для 24КНТ-{group} группы."
-                bot.send_message(chat_id, text)
-                bot.send_photo(chat_id, image)
-        except FileNotFoundError:
-            bot.send_message(chat_id, f"Извини, расписание на {day_display} пока не готово.")
-
     # Обработка дедлайнов
     elif data.startswith('deadline_'):
         if data == 'deadline_add_deadline':
@@ -447,7 +434,7 @@ def handle_deadline_input(message):
         # Сохраняем название дедлайна и ожидаем дату
         user_deadlines.setdefault(str(chat_id), []).append({'name': deadline_name, 'date': ''})
         user_states[chat_id] = 'awaiting_deadline_date'
-        bot.send_message(chat_id, "Введите дату дедлайна в формате День.Месяц.Год (например, 31.12.2024):")
+        bot.send_message(chat_id, "Введи дату дедлайна в формате День.Месяц.Год (например, 31.12.2024):")
     
     elif state == 'awaiting_deadline_date':
         deadline_date_input = message.text.strip()
