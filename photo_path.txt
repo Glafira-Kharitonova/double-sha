@@ -1,31 +1,31 @@
-105: C:\Users\galat\Desktop\double sha\маршрутыльвовка\105.jpg
-145: C:\Users\galat\Desktop\double sha\маршрутыльвовка\145.jpg
-146: C:\Users\galat\Desktop\double sha\маршрутыльвовка\146.jpg
-147: C:\Users\galat\Desktop\double sha\маршрутыльвовка\147.jpg
-201: C:\Users\galat\Desktop\double sha\маршрутыльвовка\201.jpg
-202: C:\Users\galat\Desktop\double sha\маршрутыльвовка\202.jpg
-203: C:\Users\galat\Desktop\double sha\маршрутыльвовка\203.jpg
-204: C:\Users\galat\Desktop\double sha\маршрутыльвовка\204.jpg
-207: C:\Users\galat\Desktop\double sha\маршрутыльвовка\207.jpg 
-219: C:\Users\galat\Desktop\double sha\маршрутыльвовка\219.jpg
-220: C:\Users\galat\Desktop\double sha\маршрутыльвовка\220.jpg
-222: C:\Users\galat\Desktop\double sha\маршрутыльвовка\222.jpg
-224: C:\Users\galat\Desktop\double sha\маршрутыльвовка\224.jpg
-225: C:\Users\galat\Desktop\double sha\маршрутыльвовка\225.jpg
-226: C:\Users\galat\Desktop\double sha\маршрутыльвовка\226.jpg
-301: C:\Users\galat\Desktop\double sha\маршрутыльвовка\301.jpg
-302: C:\Users\galat\Desktop\double sha\маршрутыльвовка\302.jpg
-303: C:\Users\galat\Desktop\double sha\маршрутыльвовка\303.jpg
-304: C:\Users\galat\Desktop\double sha\маршрутыльвовка\304.jpg
-305: C:\Users\galat\Desktop\double sha\маршрутыльвовка\305.jpg
-306: C:\Users\galat\Desktop\double sha\маршрутыльвовка\306.jpg
-307: C:\Users\galat\Desktop\double sha\маршрутыльвовка\307.jpg
-308: C:\Users\galat\Desktop\double sha\маршрутыльвовка\308.jpg
-309: C:\Users\galat\Desktop\double sha\маршрутыльвовка\309.jpg
-318: C:\Users\galat\Desktop\double sha\маршрутыльвовка\318.jpg
-319: C:\Users\galat\Desktop\double sha\маршрутыльвовка\319.jpg
-320: C:\Users\galat\Desktop\double sha\маршрутыльвовка\320.jpg
-322: C:\Users\galat\Desktop\double sha\маршрутыльвовка\322.jpg
-323: C:\Users\galat\Desktop\double sha\маршрутыльвовка\323.jpg
-324: C:\Users\galat\Desktop\double sha\маршрутыльвовка\324.jpg
-325: C:\Users\galat\Desktop\double sha\маршрутыльвовка\325.jpg
+105: маршрутыльвовка\105.jpg
+145: маршрутыльвовка\145.jpg
+146: маршрутыльвовка\146.jpg
+147: маршрутыльвовка\147.jpg
+201: маршрутыльвовка\201.jpg
+202: маршрутыльвовка\202.jpg
+203: маршрутыльвовка\203.jpg
+204: маршрутыльвовка\204.jpg
+207: маршрутыльвовка\207.jpg 
+219: маршрутыльвовка\219.jpg
+220: маршрутыльвовка\220.jpg
+222: маршрутыльвовка\222.jpg
+224: маршрутыльвовка\224.jpg
+225: маршрутыльвовка\225.jpg
+226: маршрутыльвовка\226.jpg
+301: маршрутыльвовка\301.jpg
+302: маршрутыльвовка\302.jpg
+303: маршрутыльвовка\303.jpg
+304: маршрутыльвовка\304.jpg
+305: маршрутыльвовка\305.jpg
+306: маршрутыльвовка\306.jpg
+307: маршрутыльвовка\307.jpg
+308: маршрутыльвовка\308.jpg
+309: маршрутыльвовка\309.jpg
+318: маршрутыльвовка\318.jpg
+319: маршрутыльвовка\319.jpg
+320: маршрутыльвовка\320.jpg
+322: маршрутыльвовка\322.jpg
+323: маршрутыльвовка\323.jpg
+324: маршрутыльвовка\324.jpg
+325: маршрутыльвовка\325.jpg
