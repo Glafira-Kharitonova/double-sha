@@ -91,8 +91,19 @@ def livovka_handler(message):
             key, value = line.strip().split(': ')
             audience_of_livovka[key] = value
     user_input = message.text
-    response = audience_of_livovka.get(user_input, "Аудитория не найдена. Попробуйте ещё раз.")
-    bot.send_message(message.chat.id, response)
+    draw_of_auditories = {}
+    with open('photo_path.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            key, value = line.strip().split(': ')
+            draw_of_auditories[key] = value
+    if user_input in draw_of_auditories:
+        photo_path = draw_of_auditories.get(user_input)
+        response = audience_of_livovka.get(user_input, "Аудитория не найдена. Попробуйте ещё раз.")
+        with open(photo_path, 'rb') as photo:
+            bot.send_photo(message.chat.id, photo, caption=response)
+    else:
+        response = audience_of_livovka.get(user_input, "Аудитория не найдена. Попробуйте ещё раз.")
+        bot.send_message(message.chat.id, response)
 
 
 def pecherskaya_handler(message):
@@ -107,7 +118,7 @@ def pecherskaya_handler(message):
 
 #Ответ на благодарность от пользователя
 @bot.message_handler(func=lambda message: 'спасибо' in message.text.lower())
-def thank():
+def thank(message):
     answer_for_thank = ['Не за что!', 'Обращайтесь!', 'Рад помочь!', 'Успехов Вам!', 'Не потеряйтесь!']
     bot.send_message(message.chat.id, random.choice(answer_for_thank))
 
