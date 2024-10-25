@@ -17,6 +17,31 @@ def send_support_message(message):
         support_messages = [line for line in file.readlines()]
     bot.send_message(message.chat.id, random.choice(support_messages))
 
+
+#Обработчик команды \where
+@bot.message_handler(commands=['where'])
+def where(message):
+    markup = types.InlineKeyboardMarkup()
+    livovka_button = types.InlineKeyboardButton("на Львовской", callback_data='livovka')
+    pecherskaya_button = types.InlineKeyboardButton("на Б.Печерской", callback_data='pecherskaya')
+    markup.add(livovka_button, pecherskaya_button)
+    bot.send_message(message.chat.id, 'Какой корпус Вас интересует?', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def building(call):
+    if call.data == 'livovka':
+        bot.send_message(call.message.chat.id, 'Напишите, что вы ищите.')
+        reply_markup = types.ReplyKeyboardRemove()
+        bot.register_next_step_handler(call.message, livovka_where_handler)
+
+    elif call.data == 'pecherskaya':
+        bot.send_message(call.message.chat.id, 'Напишите, что вы ищите.')
+        reply_markup = types.ReplyKeyboardRemove()
+        bot.register_next_step_handler(call.message, pecherskaya_where_handler)
+
+
+
 #Обработчик команды \audience
 @bot.message_handler(commands=['audience'])
 def audience(message):
