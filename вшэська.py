@@ -1,5 +1,5 @@
 import telebot
-from telebot import types
+from telebot import TeleBot, types
 import random
 bot = telebot.TeleBot('8179560224:AAF6aFKzEp6zJN1s31whhtHB-ABgKDzzv_E')
 
@@ -20,20 +20,25 @@ def send_support_message(message):
 #Обработчик команды \audience
 @bot.message_handler(commands=['audience'])
 def audience(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    livovka, pecherskaya = types.KeyboardButton("на Львовской"), types.KeyboardButton("на Большой Печерской")
-    markup.add(livovka, pecherskaya)
+    markup = types.InlineKeyboardMarkup()
+    livovka_button = types.InlineKeyboardButton("на Львовской", callback_data='livovka')
+    pecherskaya_button = types.InlineKeyboardButton("на Б.Печерской", callback_data='pecherskaya')
+    markup.add(livovka_button, pecherskaya_button)
     bot.send_message(message.chat.id, 'В каком корпусе находится аудитория?', reply_markup=markup)
-    reply_markup = types.ReplyKeyboardRemove()
 
-@bot.message_handler(func=lambda message: message.text in ['на Львовской', 'на Большой Печерской'])
-def building(message):
-    if message.text == 'на Львовской':
-        bot.send_message(message.chat.id, 'Напишите номер аудитории.')
-        bot.register_next_step_handler(message, livovka_handler)
-    if message.text == 'на Большой Печерской':
-        bot.send_message(message.chat.id, 'Напишите номер аудитории.')
-        bot.register_next_step_handler(message, pecherskaya_handler)
+
+@bot.callback_query_handler(func=lambda call: True)
+def building(call):
+    if call.data == 'livovka':
+        bot.send_message(call.message.chat.id, 'Напишите номер аудитории.')
+        reply_markup = types.ReplyKeyboardRemove()
+        bot.register_next_step_handler(call.message, livovka_handler)
+
+    elif call.data == 'pecherskaya':
+        bot.send_message(call.message.chat.id, 'Напишите номер аудитории.')
+        reply_markup = types.ReplyKeyboardRemove()
+        bot.register_next_step_handler(call.message, pecherskaya_handler)
+
 
 def livovka_handler(message):
     audience_of_livovka = {}
@@ -42,7 +47,7 @@ def livovka_handler(message):
             key, value = line.strip().split(': ')
             audience_of_livovka[key] = value
     user_input = message.text
-    response = audience_of_livovka.get(str(user_input), "Аудитория не найдена.")
+    response = audience_of_livovka.get(user_input, "Аудитория не найдена.")
     bot.send_message(message.chat.id, response)
 
 
@@ -53,7 +58,7 @@ def pecherskaya_handler(message):
             key, value = line.strip().split(': ')
             audience_of_pecherskaya[key] = value
     user_input = message.text
-    response = audience_of_pecherskaya.get(str(user_input), "Аудитория не найдена.")
+    response = audience_of_pecherskaya.get(user_input, "Аудитория не найдена.")
     bot.send_message(message.chat.id, response)
 
 #Ответ на благодарность от пользователя
