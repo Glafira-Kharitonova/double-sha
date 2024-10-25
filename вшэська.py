@@ -3,11 +3,17 @@ from telebot import types
 import random
 bot = telebot.TeleBot('8179560224:AAF6aFKzEp6zJN1s31whhtHB-ABgKDzzv_E')
 
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    with open('start_message.txt', 'r', encoding='utf-8') as file:
+        answer = file.read()
+    bot.send_message(message.chat.id, answer)
+
 # Обработчик команды /iamsad
 @bot.message_handler(commands=['iamsad'])
 def send_support_message(message):
     with open('support_messages.txt', 'r', encoding='utf-8') as file:
-        support_message = [line for line in file.readlines()]
+        support_messages = [line for line in file.readlines()]
     bot.send_message(message.chat.id, random.choice(support_messages))
 
 
@@ -17,12 +23,6 @@ def start_message(message):
         answer = file.read()
     if message.text == "/start":
         bot.send_message(message.chat.id, answer)
-
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    with open('start_message.txt', 'r', encoding='utf-8') as file:
-        answer = file.read()
-    bot.send_message(message.chat.id, answer)
 
 @bot.message_handler(commands=['audience'])
 def audience(message):
