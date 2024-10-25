@@ -16,6 +16,7 @@ user_states = {}
 
 # Файлы
 DEADLINES_FILE = 'files/deadlines.json'
+LECTURER_INFO_FILE = 'files/lecturer_info.xlsx'
 NAME_GROUP_FILE = 'eng timetable files/names_groups.xlsx'  # Первый Excel файл с именами и группами
 GROUP_INFO_FILE = 'eng timetable files/group_info.xlsx'    # Второй Excel файл с расписанием по группам
 
@@ -180,6 +181,82 @@ def deadline_command(message):
 
     # Отправляем сообщение с кнопками для дедлайнов
     bot.send_message(message.chat.id, "Что ты хочешь сделать?", reply_markup=markup)
+
+# Команда /lecturer
+@bot.message_handler(commands=['lecturer'])
+def lecturer_command(message):
+    chat_id = message.chat.id
+    bot.send_message(chat_id, "Введи название предмета для получения информации о преподавателях (например, 'программирование c/c++').")
+    user_states[chat_id] = 'awaiting_subject_name'
+
+# Обработчик для получения информации о преподавателях
+@bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'awaiting_subject_name')
+def handle_subject_input(message):
+    chat_id = message.chat.id
+    subject_input = message.text.strip().lower()
+    user_states.pop(chat_id, None)
+
+    try:
+        df = pd.read_excel(LECTURER_INFO_FILE, header=None)
+        
+        subject_data = df[df[0].str.lower().str.contains(subject_input, na=False)]
+
+        lecturers_info = []
+        formulas_info = []
+        modules_info_set = set() 
+
+        if not subject_data.empty:
+            course_name = subject_data[0].iloc[0]
+
+            # Заполняем списки
+            for _, row in subject_data.iterrows():
+                lecturer = row[1] if not pd.isna(row[1]) else None
+                email = row[2] if not pd.isna(row[2]) else None
+                modules = row[3] if not pd.isna(row[3]) else None
+                formula = row[4] if not pd.isna(row[4]) else None
+
+                # Формируем информацию о преподавателе и почте
+                if lecturer:
+                    lecturer_info = f"📚 Преподаватель: {lecturer}"
+                    if email:
+                        lecturer_info += f"\n✉️ Почта: {email}"
+                    else:
+                        lecturer_info += "\n✉️ Почта: Информация отсутствует"
+                    lecturers_info.append(lecturer_info)
+
+                if formula:
+                    formulas_info.append(f"📐 {formula}")
+
+                if modules:
+                    modules_info_set.add(modules)
+
+            # Формируем ответ
+            response = f"Информация о курсе '{course_name}':\n\n"
+
+            # Проверяем наличие информации о преподавателях
+            if lecturers_info:
+                response += "\n".join(lecturers_info) + "\n\n"
+            else:
+                response += "📚 Преподаватели: Информация отсутствует\n\n"
+
+            if formulas_info:
+                response += "\n".join(formulas_info) + "\n\n"
+            else:
+                response += "📐 Формула для оценки: Информация отсутствует\n\n"
+
+            if modules_info_set:
+                response += "📆 Модули с экзаменами: " + ", ".join(modules_info_set)
+            else:
+                response += "📆 Модули с экзаменами: Информация отсутствует"
+
+            # Убираем лишний перенос строки
+            response = response.rstrip()
+            bot.send_message(chat_id, response)
+        else:
+            bot.send_message(chat_id, f"Предмет, содержащий '{subject_input}', не найден. Проверьте название и попробуйте снова.")
+    except Exception as e:
+        print(f"Error while reading lecturer data: {e}")
+        bot.send_message(chat_id, "Произошла ошибка при обработке данных. Пожалуйста, попробуйте позже.")
 
 # Обработчик ввода ФИО
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'awaiting_name')
