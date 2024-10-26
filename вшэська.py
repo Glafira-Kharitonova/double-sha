@@ -436,9 +436,9 @@ def handle_name_input(message):
                     response = "\n".join(response_lines)
                     bot.send_message(chat_id, response, parse_mode='Markdown')
                 else:
-                    bot.send_message(chat_id, f"У группы {group_number} в {response_day} нет занятий по английскому.")
+                    bot.send_message(chat_id, f"В {response_day} у Вас нет занятий.")
             except Exception as e:
-                bot.send_message(chat_id, "Произошла ошибка при получении расписания по английскому.")
+                bot.send_message(chat_id, "Произошла ошибка при получении расписания.")
         else:
             bot.send_message(chat_id, "ФИО не найдено. Пожалуйста, проверь написание и попробуй снова.")
     except Exception as e:
