@@ -436,7 +436,7 @@ def handle_name_input(message):
                     response = "\n".join(response_lines)
                     bot.send_message(chat_id, response, parse_mode='Markdown')
                 else:
-                    bot.send_message(chat_id, f"В {response_day} у Вас нет занятий.")
+                    bot.send_message(chat_id, f"У Вас нет пар в этот день.")
             except Exception as e:
                 bot.send_message(chat_id, "Произошла ошибка при получении расписания.")
         else:
