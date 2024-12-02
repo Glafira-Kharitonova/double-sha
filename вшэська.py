@@ -6,8 +6,16 @@ import os
 import pandas as pd
 import threading
 import time
+import random
 
 bot = telebot.TeleBot('8179560224:AAF6aFKzEp6zJN1s31whhtHB-ABgKDzzv_E')
+
+#Сообщение-приветствие
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    with open('start_message.txt', 'r', encoding='utf-8') as file:
+        answer = file.read()
+    bot.send_message(message.chat.id, answer)
 
 # Словари для хранения выбора пользователей
 user_group_choice = {} 
@@ -20,6 +28,118 @@ LECTURER_INFO_FILE = 'files/lecturer_info.xlsx'
 NAME_GROUP_FILE = 'eng timetable files/names_groups.xlsx'  # Первый Excel файл с именами и группами
 GROUP_INFO_FILE = 'eng timetable files/group_info.xlsx'    # Второй Excel файл с расписанием по группам
 SCHEDULE_DAY_FILE_TEMPLATE = 'timetables/day/day_timetable_{}.json'  # Шаблон для имени файла
+
+# Обработчик команды /iamsad
+@bot.message_handler(commands=['iamsad'])
+def send_support_message(message):
+    with open('support_messages.txt', 'r', encoding='utf-8') as file:
+        support_messages = [line for line in file.readlines()]
+    bot.send_message(message.chat.id, random.choice(support_messages))
+
+
+#Обработчик команды \where
+@bot.message_handler(commands=['where'])
+def where(message):
+    markup = types.InlineKeyboardMarkup()
+    livovka_button = types.InlineKeyboardButton("на Львовской", callback_data='liv_where')
+    pecherskaya_button = types.InlineKeyboardButton("на Б.Печерской", callback_data='pecher_where')
+    markup.add(livovka_button, pecherskaya_button)
+    bot.send_message(message.chat.id, 'Какой корпус Вас интересует?', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda called: called.data in ['liv_where', 'pecher_where'])
+def corpus(called):
+    if called.data == 'liv_where':
+        bot.send_message(called.message.chat.id, 'Напишите, что вы ищите.')
+        reply_markup = types.ReplyKeyboardRemove()
+        bot.register_next_step_handler(called.message, livovka_where_handler)
+
+    elif called.data == 'pecher_where':
+        bot.send_message(called.message.chat.id, 'Напишите, что вы ищите.')
+        reply_markup = types.ReplyKeyboardRemove()
+        bot.register_next_step_handler(called.message, pecherskaya_where_handler)
+
+
+def livovka_where_handler(message):
+    where_of_livovka = {}
+    with open('where_of_livovka.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            key, value = line.strip().split(': ')
+            where_of_livovka[key] = value
+    user_input = message.text
+    response = where_of_livovka.get(user_input.upper(), "Я вас не понимаю. Попробуйте точнее сформулировать свой запрос.")
+    bot.send_message(message.chat.id, response)
+
+
+def pecherskaya_where_handler(message):
+    where_of_pecherskaya = {}
+    with open('where_of_pecherskaya.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            key, value = line.strip().split(': ')
+            where_of_pecherskaya[key] = value
+    user_input = message.text
+    response = where_of_pecherskaya.get(user_input.upper(), "Я вас не понимаю. Попробуйте точнее сформулировать свой запрос.")
+    bot.send_message(message.chat.id, response)
+
+
+#Обработчик команды \audience
+@bot.message_handler(commands=['audience'])
+def audience(message):
+    markup = types.InlineKeyboardMarkup()
+    livovka_button = types.InlineKeyboardButton("на Львовской", callback_data='livovka')
+    pecherskaya_button = types.InlineKeyboardButton("на Б.Печерской", callback_data='pecherskaya')
+    markup.add(livovka_button, pecherskaya_button)
+    bot.send_message(message.chat.id, 'В каком корпусе находится аудитория?', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data in ['livovka', 'pecherskaya'])
+def building(call):
+    if call.data == 'livovka':
+        bot.send_message(call.message.chat.id, 'Напишите номер аудитории.')
+        bot.register_next_step_handler(call.message, livovka_handler)
+
+    elif call.data == 'pecherskaya':
+        bot.send_message(call.message.chat.id, 'Напишите номер аудитории.')
+        bot.register_next_step_handler(call.message, pecherskaya_handler)
+
+
+def livovka_handler(message):
+    audience_of_livovka = {}
+    with open('audience_of_livovka.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            key, value = line.strip().split(': ')
+            audience_of_livovka[key] = value
+    user_input = message.text
+    draw_of_auditories = {}
+    with open('photo_path.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            key, value = line.strip().split(': ')
+            draw_of_auditories[key] = value
+    if user_input in draw_of_auditories:
+        photo_path = draw_of_auditories.get(user_input)
+        response = audience_of_livovka.get(user_input, "Аудитория не найдена. Попробуйте ещё раз.")
+        with open(photo_path, 'rb') as photo:
+            bot.send_photo(message.chat.id, photo, caption=response)
+    else:
+        response = audience_of_livovka.get(user_input, "Аудитория не найдена. Попробуйте ещё раз.")
+        bot.send_message(message.chat.id, response)
+
+
+def pecherskaya_handler(message):
+    audience_of_pecherskaya = {}
+    with open('audience_of_pecherskaya.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            key, value = line.strip().split(': ')
+            audience_of_pecherskaya[key] = value
+    user_input = message.text
+    response = audience_of_pecherskaya.get(user_input, "Аудитория не найдена. Попробуйте ещё раз")
+    bot.send_message(message.chat.id, response)
+
+#Ответ на благодарность от пользователя
+@bot.message_handler(func=lambda message: 'спасибо' in message.text.lower())
+def thank(message):
+    answer_for_thank = ['Не за что!', 'Обращайтесь!', 'Рад помочь!', 'Успехов Вам!', 'Не потеряйтесь!']
+    bot.send_message(message.chat.id, random.choice(answer_for_thank))
 
 # Функция для загрузки дедлайнов из файла
 def load_deadlines():
@@ -130,14 +250,6 @@ def send_schedule_options(chat_id, group):
     markup.add(button_week, button_today)
     bot.send_message(chat_id, "Выбери нужное расписание.", reply_markup=markup)
 
-# Команда /start
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    with open('files/start_message.txt', 'r', encoding='utf-8') as file:
-        answer = file.read()
-    if message.text == "/start":
-        bot.send_message(message.chat.id, answer)
-
 input_day = None
 
 # Команда /timetable
@@ -150,10 +262,9 @@ def timetable_message(message):
     button2 = types.InlineKeyboardButton("24КНТ-5", callback_data='group_5')
     button3 = types.InlineKeyboardButton("24КНТ-6", callback_data='group_6')
     markup.add(button1, button2, button3)
-
     bot.send_message(chat_id, "Выбери свою группу.", reply_markup=markup)
 
-        
+
 # Команда /deadline
 @bot.message_handler(commands=['deadline'])
 def deadline_command(message):
@@ -182,12 +293,12 @@ def handle_subject_input(message):
 
     try:
         df = pd.read_excel(LECTURER_INFO_FILE, header=None)
-        
+
         subject_data = df[df[0].str.lower().str.contains(subject_input, na=False)]
 
         lecturers_info = []
         formulas_info = []
-        modules_info_set = set() 
+        modules_info_set = set()
 
         if not subject_data.empty:
             course_name = subject_data[0].iloc[0]
@@ -269,7 +380,7 @@ def handle_day_input(message):
 
             response_day = f'{input_day[:-1]}у' if input_day in ['пятница', 'среда'] else input_day
             lessons = schedule['schedule'].get(input_day, [])
-            
+
             if lessons:
                 response = f"✏️ _Расписание на {response_day} для группы {group}_: ✏️\n\n"
                 for lesson in lessons:
@@ -321,7 +432,7 @@ def handle_name_input(message):
                         response_lines.append(f"\u200B    •    *Время:* _{time}_")
                         response_lines.append(f"\u200B          *Преподаватель:* _{teacher}_")
                         response_lines.append(f"\u200B          *Аудитория:* _{audience_number}_ - _{building}_\n")
-                
+
                     response = "\n".join(response_lines)
                     bot.send_message(chat_id, response, parse_mode='Markdown')
                 else:
@@ -371,7 +482,7 @@ def handle_callback_query(call):
         bot.send_message(chat_id, "Введите день недели (например, понедельник):")
         user_states[chat_id] = 'awaiting_day'  # Устанавливаем состояние ожидания дня недели
         bot.answer_callback_query(call.id)
-        
+
     # Обработка дедлайнов
     elif data.startswith('deadline_'):
         if data == 'deadline_add_deadline':
@@ -403,7 +514,7 @@ def handle_callback_query(call):
                     bot.send_message(chat_id, "Что-то пошло не так...")
             except ValueError:
                 bot.send_message(chat_id, "Ошибка обработки данных.")
-        
+
         elif data.startswith('deadline_delete_'):
             try:
                 idx = int(data.split('_')[-1])
@@ -435,7 +546,7 @@ def handle_deadline_input(message):
         user_deadlines.setdefault(str(chat_id), []).append({'name': deadline_name, 'date': ''})
         user_states[chat_id] = 'awaiting_deadline_date'
         bot.send_message(chat_id, "Введи дату дедлайна в формате День.Месяц.Год (например, 31.12.2024):")
-    
+
     elif state == 'awaiting_deadline_date':
         deadline_date_input = message.text.strip()
         # Проверяем формат даты
@@ -461,7 +572,7 @@ def handle_deadline_input(message):
         else:
             bot.send_message(chat_id, "Произошла ошибка при сохранении дедлайна.")
             user_states.pop(chat_id, None)
-    
+
     elif state.startswith('editing_deadline_'):
         try:
             parts = state.split('_')
@@ -510,5 +621,5 @@ def handle_deadline_input(message):
         except ValueError:
             bot.send_message(chat_id, "Ошибка обработки данных.")
             user_states.pop(chat_id, None)
-    
-bot.infinity_polling() 
+
+bot.infinity_polling()
